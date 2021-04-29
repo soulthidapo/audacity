@@ -258,12 +258,17 @@ SampleBlockPtr SqliteSampleBlockFactory::DoCreateFromXML(
                // First sight of this id
                auto ssb =
                   std::make_shared<SqliteSampleBlock>(shared_from_this());
-               wb = ssb;
                sb = ssb;
                ssb->mSampleFormat = srcformat;
                // This may throw database errors
                // It initializes the rest of the fields
                ssb->Load((SampleBlockID) nValue);
+               if( !ssb->mValid)
+               {
+                  sb = DoCreateSilent( 262144, floatSample );
+                  return sb;
+               }
+               wb = ssb;
             }
          }
          found++;
@@ -643,7 +648,15 @@ void SqliteSampleBlock::Load(SampleBlockID sbid)
 
    // Execute the statement
    rc = sqlite3_step(stmt);
-   if (rc != SQLITE_ROW)
+   if( rc == SQLITE_DONE)
+   {
+      // Clear statement bindings and rewind statement
+      sqlite3_clear_bindings(stmt);
+      sqlite3_reset(stmt);
+      mValid = false;
+      return;
+   }
+   else if (rc != SQLITE_ROW)
    {
       wxLogDebug(wxT("SqliteSampleBlock::Load - SQLITE error %s"), sqlite3_errmsg(db));
 
